@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { ShoppingBag, Shield, User, Database, LogOut, Sparkles, X, Key } from 'lucide-react';
+import { ShoppingBag, Shield, User, Database, LogOut, Sparkles, X, Key, Menu } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { useTranslation } from '../contexts/LanguageContext';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface HeaderProps {
   currentView: string;
@@ -13,6 +14,9 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onSetView }) => {
   const { user, role, logout, loginAsRole, loginWithCredentials, isDbConfigured } = useAuth();
   const { cartCount } = useCart();
   const { language, setLanguage, t } = useTranslation();
+
+  // Mobile Menu State
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Login Modal State
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -34,13 +38,15 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onSetView }) => {
     setIsLoading(true);
 
     try {
-      const success = await loginWithCredentials(email, password);
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanPassword = password.trim();
+      const success = await loginWithCredentials(cleanEmail, cleanPassword);
       if (success) {
         setIsLoginOpen(false);
         setEmail('');
         setPassword('');
         // Toggle view after successful admin login
-        if (email === 'admin@gmail.com') {
+        if (cleanEmail === 'admin@gmail.com') {
           onSetView('admin_dashboard');
         } else {
           onSetView('user_dashboard');
@@ -55,15 +61,17 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onSetView }) => {
     }
   };
 
+  const isRtl = language === 'ar';
+
   return (
-    <header className="sticky top-0 z-50 w-full bg-[#0a0a0a] text-[#e5e7eb] border-b border-[#D4AF37]/20 shadow-xl">
+    <header className="sticky top-0 z-50 w-full bg-[#0a0a0a] text-[#e5e7eb] border-b border-[#D4AF37]/25 shadow-xl">
       {/* Top Warning/Status Bar */}
       <div className="w-full bg-[#070707] text-[#D4AF37] border-b border-[#D4AF37]/10 text-xs px-4 py-1.5 font-medium flex justify-between items-center sm:px-6">
         <div className="flex items-center gap-1.5">
-          <Sparkles size={13} className="animate-pulse" />
-          <span>{t('experience_banner')}</span>
+          <Sparkles size={13} className="animate-pulse flex-shrink-0" />
+          <span className="truncate max-w-[220px] xs:max-w-none text-[10px] sm:text-xs">{t('experience_banner')}</span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="hidden sm:flex items-center gap-4">
           {/* Language Selector */}
           <div className="flex items-center gap-1 bg-black/60 border border-[#D4AF37]/25 rounded-md px-1 py-0.5">
             <button
@@ -86,30 +94,33 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onSetView }) => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="flex items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5">
+        <div className="flex items-center justify-between gap-2.5">
           
           {/* Logo */}
           <div 
-            onClick={() => onSetView('home')} 
+            onClick={() => {
+              onSetView('home');
+              setIsMobileMenuOpen(false);
+            }} 
             className="flex flex-col items-start cursor-pointer group"
           >
-            <span className="text-xl sm:text-2xl font-serif tracking-[0.3em] text-[#D4AF37] font-black group-hover:text-[#D4AF37]/80 transition-colors uppercase">
+            <span className="text-lg sm:text-2xl font-serif tracking-[0.2em] sm:tracking-[0.3em] text-[#D4AF37] font-black group-hover:text-[#D4AF37]/80 transition-colors uppercase">
               Nefertari
             </span>
-            <span className="text-[9px] font-mono tracking-[0.4em] text-stone-400 pl-0.5 uppercase group-hover:text-[#D4AF37]/60 transition-colors">
+            <span className="text-[8px] sm:text-[9px] font-mono tracking-[0.25em] sm:tracking-[0.4em] text-stone-400 pl-0.5 uppercase group-hover:text-[#D4AF37]/60 transition-colors">
               نفرتاري • ROYAL PASSAGE
             </span>
           </div>
 
-          {/* Nav Links */}
+          {/* Nav Links - Desktop only */}
           <nav className="hidden md:flex items-center gap-1.5">
             {links.map((link) => (
               <button
                 key={link.id}
                 id={`nav-${link.id}`}
                 onClick={() => onSetView(link.id)}
-                className={`px-4 py-2 rounded-md text-xs tracking-[0.2em] font-semibold transition-all uppercase ${
+                className={`px-3.5 py-2 rounded-md text-xs tracking-[0.15em] font-semibold transition-all uppercase ${
                   currentView === link.id
                     ? 'text-[#D4AF37] bg-[#070707] border-b-2 border-[#D4AF37]'
                     : 'text-stone-300 hover:text-[#D4AF37] hover:bg-zinc-900/60'
@@ -121,11 +132,11 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onSetView }) => {
           </nav>
 
           {/* Action Items */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             
-            {/* Quick Demo Role Switcher Toggle */}
-            <div className="bg-[#070707] border border-[#D4AF37]/20 rounded-lg px-2 py-1 flex items-center gap-1 text-[11px]">
-              <span className="text-stone-400 font-mono text-[9px] mr-1 uppercase hidden lg:inline">Role Dev Toggle:</span>
+            {/* Quick Demo Role Switcher Toggle - Desktop only */}
+            <div className="hidden lg:flex bg-[#070707] border border-[#D4AF37]/20 rounded-lg px-2 py-1 items-center gap-1 text-[11px]">
+              <span className="text-stone-400 font-mono text-[9px] mr-1 uppercase">Role Dev Toggle:</span>
               <button
                 id="toggle-role-user"
                 onClick={() => loginAsRole('user')}
@@ -149,20 +160,23 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onSetView }) => {
             {/* Cart Button */}
             <button
               id="header-cart-btn"
-              onClick={() => onSetView('cart')}
+              onClick={() => {
+                onSetView('cart');
+                setIsMobileMenuOpen(false);
+              }}
               className="p-2 text-[#e5e7eb] hover:text-[#D4AF37] hover:bg-[#070707] rounded-full transition-all relative flex items-center justify-center border border-transparent hover:border-[#D4AF37]/20 cursor-pointer"
             >
-              <ShoppingBag size={20} />
+              <ShoppingBag size={19} />
               {cartCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-[#D4AF37] text-black font-bold text-[10px] w-5 h-5 rounded-full flex items-center justify-center animate-bounce">
+                <span className="absolute -top-1 -right-1 bg-[#D4AF37] text-black font-extrabold text-[9px] w-4.5 h-4.5 rounded-full flex items-center justify-center animate-bounce">
                   {cartCount}
                 </span>
               )}
             </button>
 
-            {/* Cabinet Dashboard and Credentials Gate info */}
+            {/* Cabinet Dashboard and Credentials Gate info - Desktop only */}
             {user ? (
-              <div className="flex items-center gap-2">
+              <div className="hidden md:flex items-center gap-2">
                 <button
                   id="header-dashboard-btn"
                   onClick={() => onSetView(role === 'admin' ? 'admin_dashboard' : 'user_dashboard')}
@@ -184,7 +198,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onSetView }) => {
                   title={t('logout')}
                 >
                   <LogOut size={12} />
-                  <span className="hidden sm:inline">{t('logout')}</span>
+                  <span>{t('logout')}</span>
                 </button>
               </div>
             ) : (
@@ -193,35 +207,206 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onSetView }) => {
                   setLoginError(null);
                   setIsLoginOpen(true);
                 }}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold uppercase bg-[#D4AF37] text-black hover:bg-[#F3E5AB] cursor-pointer transition-all tracking-wider"
+                className="hidden md:flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold uppercase bg-[#D4AF37] text-black hover:bg-[#F3E5AB] cursor-pointer transition-all tracking-wider"
               >
                 <Key size={13} />
                 <span>{t('sign_in')}</span>
               </button>
             )}
 
+            {/* Hamburger Button for Mobile */}
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="md:hidden p-2 text-[#e5e7eb] hover:text-[#D4AF37] hover:bg-[#070707] rounded-lg border border-[#D4AF37]/20 transition-all cursor-pointer flex items-center justify-center bg-black/40"
+              aria-label="Toggle Menu"
+            >
+              {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+
           </div>
 
         </div>
       </div>
 
-      {/* Mobile Nav Links */}
-      <div className="md:hidden w-full bg-[#070707] border-t border-[#D4AF37]/10 flex justify-around py-2">
-        {links.map((link) => (
-          <button
-            key={link.id}
-            id={`nav-mob-${link.id}`}
-            onClick={() => onSetView(link.id)}
-            className={`px-3 py-1.5 rounded text-xs tracking-wider uppercase font-medium ${
-              currentView === link.id
-                ? 'text-[#D4AF37] bg-black/40 border border-[#D4AF37]/20'
-                : 'text-stone-400 hover:text-[#D4AF37]'
-            } ${language === 'ar' ? 'font-arabic' : ''}`}
-          >
-            {t(link.labelKey)}
-          </button>
-        ))}
-      </div>
+      {/* Mobile Drawer Navigation Menu */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <div className="fixed inset-0 z-50 md:hidden flex justify-end">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 bg-black/85 backdrop-blur-md"
+            />
+
+            {/* Side Drawer Content */}
+            <motion.div
+              initial={{ x: isRtl ? '-100%' : '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: isRtl ? '-100%' : '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className={`relative z-10 w-4/5 max-w-sm h-full bg-[#0d0d0d] border-${isRtl ? 'r' : 'l'} border-[#D4AF37]/35 shadow-2xl p-6 flex flex-col justify-between`}
+            >
+              <div className="flex flex-col gap-6 overflow-y-auto">
+                {/* Header inside Drawer */}
+                <div className="flex items-center justify-between border-b border-[#D4AF37]/15 pb-4">
+                  <div className="flex flex-col">
+                    <span className="text-lg font-serif tracking-[0.2em] text-[#D4AF37] font-extrabold uppercase">
+                      Nefertari
+                    </span>
+                    <span className="text-[8px] font-mono tracking-[0.3em] text-stone-400 uppercase">
+                      نفرتاري • ROYAL PASSAGE
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="p-1.5 text-stone-400 hover:text-[#D4AF37] hover:bg-zinc-900 border border-[#D4AF37]/20 rounded-md transition-all cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Navigation Links inside Drawer */}
+                <nav className="flex flex-col gap-2">
+                  {links.map((link) => (
+                    <button
+                      key={link.id}
+                      id={`nav-mob-drawer-${link.id}`}
+                      onClick={() => {
+                        onSetView(link.id);
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className={`w-full px-4 py-3 rounded-xl text-xs tracking-[0.15em] font-bold text-start transition-all uppercase flex items-center justify-between ${
+                        currentView === link.id
+                          ? 'text-[#D4AF37] bg-[#070707] border-b-2 border-[#D4AF37] shadow-md'
+                          : 'text-stone-300 hover:text-[#D4AF37] hover:bg-zinc-900/60'
+                      } ${language === 'ar' ? 'font-arabic' : ''}`}
+                    >
+                      <span>{t(link.labelKey)}</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]/40"></span>
+                    </button>
+                  ))}
+                </nav>
+
+                {/* Divider & Account Controls */}
+                <div className="border-t border-[#D4AF37]/10 pt-4">
+                  {user ? (
+                    <div className="space-y-3">
+                      <div className="p-3 bg-black border border-[#D4AF37]/15 rounded-xl flex items-center gap-3">
+                        <div className="p-1.5 bg-[#D4AF37]/10 text-[#D4AF37] rounded-full">
+                          {role === 'admin' ? <Shield size={16} /> : <User size={16} />}
+                        </div>
+                        <div className="flex flex-col truncate">
+                          <span className="text-[9px] font-mono uppercase text-stone-400">
+                            {role === 'admin' ? t('admin_dashboard') : t('user_dashboard')}
+                          </span>
+                          <span className="text-xs font-bold text-stone-200 truncate">{user.full_name}</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => {
+                            onSetView(role === 'admin' ? 'admin_dashboard' : 'user_dashboard');
+                            setIsMobileMenuOpen(false);
+                          }}
+                          className={`py-2.5 bg-black text-[#D4AF37] hover:bg-[#D4AF37]/10 border border-[#D4AF37]/30 rounded-xl text-center text-[11px] font-extrabold uppercase transition-all tracking-wider cursor-pointer ${language === 'ar' ? 'font-arabic' : ''}`}
+                        >
+                          {role === 'admin' ? t('admin_dashboard').split(' ')[0] : t('user_dashboard').split(' ')[0]}
+                        </button>
+                        <button
+                          onClick={() => {
+                            logout();
+                            onSetView('home');
+                            setIsMobileMenuOpen(false);
+                          }}
+                          className={`py-2.5 bg-red-950/20 hover:bg-red-950/35 text-red-400 border border-red-900/40 rounded-xl text-center text-[11px] font-bold uppercase transition-all flex items-center justify-center gap-1 cursor-pointer ${language === 'ar' ? 'font-arabic' : ''}`}
+                        >
+                          <LogOut size={12} />
+                          <span>{t('logout')}</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setLoginError(null);
+                        setIsLoginOpen(true);
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="w-full py-3 bg-[#D4AF37] hover:bg-[#F3E5AB] text-black font-extrabold uppercase tracking-widest rounded-xl cursor-pointer text-xs transition-all flex items-center justify-center gap-2"
+                    >
+                      <Key size={14} />
+                      <span>{t('sign_in')}</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Drawer Footer controls */}
+              <div className="border-t border-[#D4AF37]/15 pt-4 space-y-4">
+                {/* Embedded Role Dev Toggle in mobile menu */}
+                <div className="bg-black/90 border border-[#D4AF37]/20 rounded-xl p-3">
+                  <span className="block text-[8px] font-mono tracking-widest text-stone-400 text-center uppercase mb-2">
+                    Developer Role Switcher
+                  </span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      id="drawer-toggle-role-user"
+                      onClick={() => loginAsRole('user')}
+                      className={`py-1.5 rounded-lg text-[10px] font-bold transition-all uppercase ${
+                        role === 'user' ? 'bg-[#D4AF37] text-black font-extrabold' : 'text-stone-300 hover:bg-zinc-950 bg-black/40'
+                      }`}
+                    >
+                      User
+                    </button>
+                    <button
+                      id="drawer-toggle-role-admin"
+                      onClick={() => loginAsRole('admin')}
+                      className={`py-1.5 rounded-lg text-[10px] font-bold transition-all uppercase ${
+                        role === 'admin' ? 'bg-[#D4AF37] text-black font-extrabold' : 'text-stone-300 hover:bg-zinc-950 bg-black/40'
+                      }`}
+                    >
+                      Admin
+                    </button>
+                  </div>
+                </div>
+
+                {/* Embedded Language switcher inside mobile nav */}
+                <div className="flex bg-black/90 border border-[#D4AF37]/20 rounded-xl p-1.5 justify-between items-center">
+                  <span className="text-[10px] font-mono text-stone-400 px-2 uppercase">Language:</span>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => {
+                        setLanguage('en');
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded transition-colors ${
+                        language === 'en' ? 'bg-[#D4AF37] text-black font-extrabold' : 'text-stone-400 hover:text-[#D4AF37]'
+                      }`}
+                    >
+                      EN
+                    </button>
+                    <button
+                      onClick={() => {
+                        setLanguage('ar');
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded transition-colors font-arabic ${
+                        language === 'ar' ? 'bg-[#D4AF37] text-black font-extrabold' : 'text-stone-400 hover:text-[#D4AF37]'
+                      }`}
+                    >
+                      العربية
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Royal Passport Authentication Gate Modal */}
       {isLoginOpen && (
@@ -290,12 +475,6 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onSetView }) => {
                 {isSubmitting ? 'Authenticating...' : t('sign_in_btn')}
               </button>
             </form>
-
-            <div className="mt-6 border-t border-[#D4AF37]/15 pt-4 text-center">
-              <p className="text-[11px] text-stone-500 leading-relaxed max-w-xs mx-auto">
-                {t('sign_in_help')}
-              </p>
-            </div>
 
           </div>
         </div>

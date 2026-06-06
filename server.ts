@@ -760,11 +760,14 @@ app.post("/api/auth/demo-toggle", (req, res) => {
 // Credentials verification endpoint (as requested by user)
 app.post("/api/auth/login", (req, res) => {
   const { email, password } = req.body;
-  if (email === "admin@gmail.com" && password === "ADMIN1234") {
+  const cleanEmail = (email || "").trim().toLowerCase();
+  const cleanPassword = (password || "").trim();
+
+  if (cleanEmail === "admin@gmail.com" && (cleanPassword === "ADMIN1234" || cleanPassword.toUpperCase() === "ADMIN1234")) {
     res.json({ token: "mock-admin-token", profile: profiles[1] });
-  } else if (email && password) {
+  } else if (cleanEmail && cleanPassword) {
     // Regular valid user email
-    res.json({ token: "mock-user-token", profile: { ...profiles[0], full_name: email.split("@")[0] } });
+    res.json({ token: "mock-user-token", profile: { ...profiles[0], full_name: cleanEmail.split("@")[0] } });
   } else {
     res.status(400).json({ error: "Missing authenticating email or verification code" });
   }
