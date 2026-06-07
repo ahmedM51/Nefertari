@@ -11,7 +11,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ currentView, onSetView }) => {
-  const { user, role, logout, loginAsRole, loginWithCredentials, registerAccount, isDbConfigured } = useAuth();
+  const { user, role, logout, loginAsRole, loginWithCredentials, isDbConfigured } = useAuth();
   const { cartCount } = useCart();
   const { language, setLanguage, t } = useTranslation();
 
@@ -20,12 +20,9 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onSetView }) => {
 
   // Login Modal State
   const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
-  const [loginSuccess, setLoginSuccess] = useState<string | null>(null);
   const [isSubmitting, setIsLoading] = useState(false);
 
   const links = [
@@ -38,32 +35,18 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onSetView }) => {
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
-    setLoginSuccess(null);
     setIsLoading(true);
 
     try {
       const cleanEmail = email.trim().toLowerCase();
       const cleanPassword = password.trim();
-
-      if (authMode === 'register') {
-        const result = await registerAccount(cleanEmail, cleanPassword, fullName.trim());
-        if (result.success) {
-          setLoginSuccess(t('register_success'));
-          setAuthMode('login');
-          setPassword('');
-        } else {
-          setLoginError(result.error || t('register_failed'));
-        }
-        return;
-      }
-
-      const loggedInProfile = await loginWithCredentials(cleanEmail, cleanPassword);
-      if (loggedInProfile) {
+      const success = await loginWithCredentials(cleanEmail, cleanPassword);
+      if (success) {
         setIsLoginOpen(false);
         setEmail('');
         setPassword('');
-        setFullName('');
-        if (loggedInProfile.role === 'admin') {
+        // Toggle view after successful admin login
+        if (cleanEmail === 'admin@gmail.com') {
           onSetView('admin_dashboard');
         } else {
           onSetView('user_dashboard');
@@ -442,51 +425,14 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onSetView }) => {
                 <Key size={24} />
               </span>
               <h3 className="text-xl font-bold font-serif text-[#D4AF37] uppercase tracking-wide">
-                {authMode === 'login' ? t('sign_in_title') : t('register_title')}
+                {t('sign_in_title')}
               </h3>
               <p className="text-stone-400 text-xs mt-1">
-                {authMode === 'login' ? t('login_title') : t('register_subtitle')}
+                {t('login_title')}
               </p>
             </div>
 
-            <div className="flex mb-5 bg-black/50 border border-[#D4AF37]/20 rounded-xl p-1">
-              <button
-                type="button"
-                onClick={() => { setAuthMode('login'); setLoginError(null); setLoginSuccess(null); }}
-                className={`flex-1 py-2 text-xs font-bold uppercase rounded-lg transition-colors ${
-                  authMode === 'login' ? 'bg-[#D4AF37] text-black' : 'text-stone-400 hover:text-[#D4AF37]'
-                }`}
-              >
-                {t('sign_in')}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setAuthMode('register'); setLoginError(null); setLoginSuccess(null); }}
-                className={`flex-1 py-2 text-xs font-bold uppercase rounded-lg transition-colors ${
-                  authMode === 'register' ? 'bg-[#D4AF37] text-black' : 'text-stone-400 hover:text-[#D4AF37]'
-                }`}
-              >
-                {t('register_btn')}
-              </button>
-            </div>
-
             <form onSubmit={handleLoginSubmit} className="space-y-4">
-              {authMode === 'register' && (
-                <div>
-                  <label className="block text-xs font-semibold text-stone-300 uppercase tracking-widest mb-1.5">
-                    {t('full_name')}
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder={t('full_name')}
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-black text-white border border-[#D4AF37]/25 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#D4AF37] text-sm"
-                  />
-                </div>
-              )}
-
               <div>
                 <label className="block text-xs font-semibold text-stone-300 uppercase tracking-widest mb-1.5">
                   {t('enter_email')}
@@ -521,27 +467,13 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onSetView }) => {
                 </div>
               )}
 
-              {loginSuccess && (
-                <div className="p-3 bg-emerald-950/30 border border-emerald-500/35 rounded-xl text-emerald-300 text-xs font-medium">
-                  {loginSuccess}
-                </div>
-              )}
-
               <button
                 type="submit"
                 disabled={isSubmitting}
                 className="w-full py-3 bg-[#D4AF37] hover:bg-[#F3E5AB] text-black font-bold uppercase tracking-wider rounded-xl cursor-pointer text-xs transition-colors"
               >
-                {isSubmitting
-                  ? (authMode === 'login' ? 'Authenticating...' : 'Creating account...')
-                  : (authMode === 'login' ? t('sign_in_btn') : t('register_submit'))}
+                {isSubmitting ? 'Authenticating...' : t('sign_in_btn')}
               </button>
-
-              {authMode === 'login' && (
-                <p className="text-[10px] text-stone-500 text-center leading-relaxed">
-                  {t('sign_in_help')}
-                </p>
-              )}
             </form>
 
           </div>

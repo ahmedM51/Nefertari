@@ -32,14 +32,8 @@ const translations: Record<Language, Record<string, string>> = {
     'enter_email': 'Passport Email Address',
     'enter_password': 'Security Authorization Code',
     'sign_in_btn': 'Authorize Passage',
-    'sign_in_help': 'New users: register first. Admin credentials are set in server environment variables.',
+    'sign_in_help': 'Login as Admin: admin@gmail.com / ADMIN1234. Any other email logs in as User.',
     'invalid_credentials': 'Invalid credentials. Please inspect entry coordinates.',
-    'register_btn': 'Register',
-    'register_title': 'Create New Account',
-    'register_subtitle': 'Join Nefertari Heritage Platform',
-    'register_submit': 'Create Account',
-    'register_success': 'Account created! You can now sign in.',
-    'register_failed': 'Registration failed. Please try again.',
 
     // Home Screen
     'hero_title': 'Nefertari Heritage',
@@ -227,14 +221,8 @@ const translations: Record<Language, Record<string, string>> = {
     'enter_email': 'البريد الإلكتروني المسجل',
     'enter_password': 'شفرة المرور الأمنية',
     'sign_in_btn': 'اعتماد الولوج والعبور',
-    'sign_in_help': 'المستخدمون الجدد: أنشئ حساباً أولاً. بيانات المسؤول تُضبط في متغيرات البيئة على السيرفر.',
+    'sign_in_help': 'للدخول كمسؤول: admin@gmail.com / الشفرة ADMIN1234. أي بريد آخر يدخل كحساب سائح عادي.',
     'invalid_credentials': 'بيانات الاعتماد المدخلة غير صحيحة. يرجى مراجعة بيانات جواز السفر.',
-    'register_btn': 'إنشاء حساب',
-    'register_title': 'إنشاء حساب جديد',
-    'register_subtitle': 'انضم إلى منصة تراث نفرتاري',
-    'register_submit': 'إنشاء الحساب',
-    'register_success': 'تم إنشاء الحساب بنجاح! يمكنك تسجيل الدخول الآن.',
-    'register_failed': 'فشل إنشاء الحساب. يرجى المحاولة مرة أخرى.',
 
     // Home Screen
     'hero_title': 'تراث نفرتاري',

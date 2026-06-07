@@ -1,27 +1,18 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
 import cors from "cors";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 
+// Load environment variables
 dotenv.config();
 
+// Initialize express app
 const app = express();
-const PORT = Number(process.env.PORT) || 3000;
-const DATA_DIR = path.join(process.cwd(), "data");
-const STORE_FILE = path.join(DATA_DIR, "store.json");
-
-const adminEmail = (process.env.ADMIN_EMAIL || "").trim().toLowerCase();
-const adminPassword = (process.env.ADMIN_PASSWORD || "").trim();
+const PORT = 3000;
 
 app.use(cors());
 app.use(express.json());
-
-// Health check for Hostinger / uptime monitors
-app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, port: PORT, env: process.env.NODE_ENV || "development" });
-});
 
 // ==========================================================
 // DB STATE (FALLBACK TO FULL METRIC & DATA SIMULATOR IF SUPABASE IS ACTIVE/INACTIVE)
@@ -262,62 +253,13 @@ let profiles = [
   }
 ];
 
-// Local mock credential store (persisted to data/store.json on Hostinger)
-const registeredUsers: { email: string; password: string; profileId: string }[] = [];
-
-function isPlaceholder(value: string) {
-  return !value || value.includes("your-") || value.includes("MY_") || value === "undefined";
-}
-
-function loadPersistedStore() {
-  try {
-    if (!fs.existsSync(STORE_FILE)) return;
-    const raw = fs.readFileSync(STORE_FILE, "utf-8");
-    const store = JSON.parse(raw);
-    if (Array.isArray(store.registeredUsers)) {
-      registeredUsers.push(...store.registeredUsers);
-    }
-    if (Array.isArray(store.profiles)) {
-      for (const p of store.profiles) {
-        if (!profiles.find((existing) => existing.id === p.id)) {
-          profiles.push(p);
-        }
-      }
-    }
-    console.log(`Loaded ${registeredUsers.length} registered user(s) from persistent store.`);
-  } catch (err) {
-    console.error("Failed to load persistent store:", err);
-  }
-}
-
-function savePersistedStore() {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    const extraProfiles = profiles.filter(
-      (p) => p.id !== "demo-user-id" && p.id !== "demo-admin-id"
-    );
-    fs.writeFileSync(
-      STORE_FILE,
-      JSON.stringify({ registeredUsers, profiles: extraProfiles }, null, 2),
-      "utf-8"
-    );
-  } catch (err) {
-    console.error("Failed to save persistent store:", err);
-  }
-}
-
-loadPersistedStore();
-
 // ==========================================================
 // SUPABASE CLIENT INITIALIZATION (LAZY / AUTO DETECT)
 // ==========================================================
 const supabaseUrl = process.env.SUPABASE_URL || "";
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || "";
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseAnonKey;
-const isSupabaseConfigured =
-  !isPlaceholder(supabaseUrl) && !isPlaceholder(supabaseAnonKey);
+const isSupabaseConfigured = supabaseUrl !== "" && supabaseAnonKey !== "";
 
 let supabase: any = null;
 if (isSupabaseConfigured) {
@@ -814,131 +756,21 @@ app.post("/api/auth/demo-toggle", (req, res) => {
   }
 });
 
-// Account registration endpoint
-app.post("/api/auth/register", async (req, res) => {
-  const { email, password, full_name, phone } = req.body;
-  const cleanEmail = (email || "").trim().toLowerCase();
-  const cleanPassword = (password || "").trim();
-  const cleanName = (full_name || "").trim();
-
-  if (!cleanEmail || !cleanPassword || !cleanName) {
-    return res.status(400).json({ error: "Email, password, and full name are required." });
-  }
-  if (cleanPassword.length < 6) {
-    return res.status(400).json({ error: "Password must be at least 6 characters." });
-  }
-  if (adminEmail && cleanEmail === adminEmail) {
-    return res.status(400).json({ error: "This email is reserved for administration." });
-  }
-
-  if (isSupabaseConfigured && supabase) {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: cleanEmail,
-        password: cleanPassword,
-        options: { data: { full_name: cleanName, phone: phone || "" } }
-      });
-      if (error) throw error;
-
-      if (data.user) {
-        await supabase.from("profiles").upsert({
-          id: data.user.id,
-          full_name: cleanName,
-          phone: phone || "",
-          address: "",
-          role: "user"
-        });
-      }
-
-      return res.json({ success: true, message: "Account created successfully. You can now sign in." });
-    } catch (error: any) {
-      return res.status(400).json({ error: error.message });
-    }
-  }
-
-  if (registeredUsers.some((u) => u.email === cleanEmail)) {
-    return res.status(400).json({ error: "An account with this email already exists." });
-  }
-
-  const newProfile = {
-    id: "user_" + Math.random().toString(36).substr(2, 9),
-    full_name: cleanName,
-    phone: phone || "",
-    address: "",
-    role: "user" as const,
-    created_at: new Date().toISOString()
-  };
-
-  registeredUsers.push({ email: cleanEmail, password: cleanPassword, profileId: newProfile.id });
-  profiles.push(newProfile);
-  savePersistedStore();
-
-  res.json({ success: true, message: "Account created successfully. You can now sign in." });
-});
-
-// Credentials verification endpoint
-app.post("/api/auth/login", async (req, res) => {
+// Credentials verification endpoint (as requested by user)
+app.post("/api/auth/login", (req, res) => {
   const { email, password } = req.body;
   const cleanEmail = (email || "").trim().toLowerCase();
   const cleanPassword = (password || "").trim();
 
-  if (!cleanEmail || !cleanPassword) {
-    return res.status(400).json({ error: "Missing email or password." });
+  if (cleanEmail === "admin@gmail.com" && (cleanPassword === "ADMIN1234" || cleanPassword.toUpperCase() === "ADMIN1234")) {
+    res.json({ token: "mock-admin-token", profile: profiles[1] });
+  } else if (cleanEmail && cleanPassword) {
+    // Regular valid user email
+    res.json({ token: "mock-user-token", profile: { ...profiles[0], full_name: cleanEmail.split("@")[0] } });
+  } else {
+    res.status(400).json({ error: "Missing authenticating email or verification code" });
   }
-
-  // Admin credentials from environment variables only (set in Hostinger hPanel)
-  if (adminEmail && adminPassword && cleanEmail === adminEmail && cleanPassword === adminPassword) {
-    return res.json({ token: "mock-admin-token", profile: profiles[1] });
-  }
-
-  // Mock mode: verify registered users first (before Supabase)
-  const registered = registeredUsers.find((u) => u.email === cleanEmail);
-  if (registered) {
-    if (registered.password !== cleanPassword) {
-      return res.status(401).json({ error: "Invalid credentials." });
-    }
-    const profile = profiles.find((p) => p.id === registered.profileId);
-    if (profile) {
-      return res.json({ token: "mock-user-token", profile });
-    }
-  }
-
-  if (isSupabaseConfigured && supabase) {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
-        password: cleanPassword
-      });
-      if (error) throw error;
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", data.user.id)
-        .maybeSingle();
-
-      return res.json({
-        token: data.session?.access_token,
-        profile: profile || {
-          id: data.user.id,
-          full_name: cleanNameFromEmail(cleanEmail),
-          phone: "",
-          address: "",
-          role: "user",
-          created_at: new Date().toISOString()
-        }
-      });
-    } catch {
-      return res.status(401).json({ error: "Invalid credentials." });
-    }
-  }
-
-  return res.status(401).json({ error: "Invalid credentials. Please register a new account first." });
 });
-
-function cleanNameFromEmail(email: string) {
-  return email.split("@")[0].replace(/[._]/g, " ");
-}
 
 // Update Profile Detail (Tabs editing)
 app.put("/api/users/profile", requireAuth, async (req: any, res) => {
@@ -963,7 +795,6 @@ app.put("/api/users/profile", requireAuth, async (req: any, res) => {
     profile.full_name = full_name;
     profile.phone = phone;
     profile.address = address;
-    savePersistedStore();
   }
   res.json({ success: true, profile });
 });
@@ -1311,20 +1142,11 @@ app.get("/api/admin/users", requireAuth, requireAdmin, async (req, res) => {
   res.json(profiles);
 });
 
-// Global JSON error handler (prevents HTML error pages on API routes)
-app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error("API error:", err);
-  if (!res.headersSent) {
-    res.status(err.status || 500).json({ error: err.message || "Internal server error" });
-  }
-});
-
 // ==========================================================
 // VITE CLIENT INTEGRATION MIDDLEWARES & LAUNCHER
 // ==========================================================
 async function initializeServer() {
-  const isProduction = process.env.NODE_ENV === "production" || !!process.env.PORT;
-  if (!isProduction) {
+  if (process.env.NODE_ENV !== "production") {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -1333,36 +1155,21 @@ async function initializeServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    const indexPath = path.join(distPath, "index.html");
-
-    if (!fs.existsSync(indexPath)) {
-      console.error(`FATAL: ${indexPath} not found. Run "npm run build" before starting.`);
-      process.exit(1);
-    }
-
     app.use(express.static(distPath));
-    app.get("*", (req, res, next) => {
-      if (req.path.startsWith("/api/")) return next();
-      res.sendFile(indexPath, (err) => {
-        if (err) {
-          console.error("sendFile error:", err);
-          res.status(500).json({ error: "Frontend files not found." });
-        }
-      });
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
+  // Start Server listening (bound strictly to Port 3000 and 0.0.0.0)
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Nefertari (نفرتاري) Node server active on port ${PORT} (cwd: ${process.cwd()})`);
-  }).on("error", (err: NodeJS.ErrnoException) => {
-    console.error(`Failed to bind port ${PORT}:`, err.message);
-    process.exit(1);
+    console.log(`Nefertari (نفرتاري) Node server active on http://localhost:${PORT}`);
   });
 }
 
 if (!process.env.VERCEL) {
   initializeServer().catch((err) => {
-    console.error("Failed to start server:", err);
+    console.error("Failed to start civilizers server:", err);
   });
 }
 

@@ -9,8 +9,7 @@ interface AuthContextType {
   isDbConfigured: boolean;
   isLoading: boolean;
   loginAsRole: (role: UserRole) => Promise<void>;
-  loginWithCredentials: (email: string, password: string) => Promise<Profile | null>;
-  registerAccount: (email: string, password: string, fullName: string, phone?: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithCredentials: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   updateProfile: (profileData: { full_name: string; phone: string; address: string }) => Promise<boolean>;
 }
@@ -38,10 +37,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isDbConfigured, setIsDbConfigured] = useState(false);
 
   useEffect(() => {
+    // Check if live Supabase configuration is set in backend
     fetch('/api/database-status')
-      .then(async (res) => {
-        if (!res.ok) return;
-        const data = await res.json();
+      .then(res => res.json())
+      .then(data => {
         setIsDbConfigured(data.isSupabaseConfigured);
       })
       .catch(() => setIsDbConfigured(false));
@@ -55,7 +54,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: targetRole }),
       });
-      if (!res.ok) return;
       const data = await res.json();
       if (data.token) {
         setToken(data.token);
@@ -70,7 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginWithCredentials = async (email: string, password: string): Promise<Profile | null> => {
+  const loginWithCredentials = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     try {
       const res = await fetch('/api/auth/login', {
@@ -80,43 +78,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.token && data.profile) {
+        if (data.token) {
           setToken(data.token);
           setUser(data.profile);
           localStorage.setItem('nefertari_token', data.token);
           localStorage.setItem('nefertari_user', JSON.stringify(data.profile));
-          return data.profile as Profile;
+          return true;
         }
       }
-      return null;
+      return false;
     } catch (e) {
       console.error("Auth login failed:", e);
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const registerAccount = async (
-    email: string,
-    password: string,
-    fullName: string,
-    phone?: string
-  ): Promise<{ success: boolean; error?: string }> => {
-    setIsLoading(true);
-    try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, full_name: fullName, phone }),
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        return { success: true };
-      }
-      return { success: false, error: data.error || 'Registration failed.' };
-    } catch {
-      return { success: false, error: 'Server unavailable. Please try again.' };
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -167,7 +140,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isLoading,
       loginAsRole,
       loginWithCredentials,
-      registerAccount,
       logout,
       updateProfile
     }}>
