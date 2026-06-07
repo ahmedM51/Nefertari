@@ -57,13 +57,13 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onSetView }) => {
         return;
       }
 
-      const success = await loginWithCredentials(cleanEmail, cleanPassword);
-      if (success) {
+      const loggedInProfile = await loginWithCredentials(cleanEmail, cleanPassword);
+      if (loggedInProfile) {
         setIsLoginOpen(false);
         setEmail('');
         setPassword('');
         setFullName('');
-        if (cleanEmail === 'admin@gmail.com') {
+        if (loggedInProfile.role === 'admin') {
           onSetView('admin_dashboard');
         } else {
           onSetView('user_dashboard');

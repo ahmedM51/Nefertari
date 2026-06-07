@@ -9,7 +9,7 @@ interface AuthContextType {
   isDbConfigured: boolean;
   isLoading: boolean;
   loginAsRole: (role: UserRole) => Promise<void>;
-  loginWithCredentials: (email: string, password: string) => Promise<boolean>;
+  loginWithCredentials: (email: string, password: string) => Promise<Profile | null>;
   registerAccount: (email: string, password: string, fullName: string, phone?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   updateProfile: (profileData: { full_name: string; phone: string; address: string }) => Promise<boolean>;
@@ -70,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginWithCredentials = async (email: string, password: string): Promise<boolean> => {
+  const loginWithCredentials = async (email: string, password: string): Promise<Profile | null> => {
     setIsLoading(true);
     try {
       const res = await fetch('/api/auth/login', {
@@ -80,18 +80,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.token) {
+        if (data.token && data.profile) {
           setToken(data.token);
           setUser(data.profile);
           localStorage.setItem('nefertari_token', data.token);
           localStorage.setItem('nefertari_user', JSON.stringify(data.profile));
-          return true;
+          return data.profile as Profile;
         }
       }
-      return false;
+      return null;
     } catch (e) {
       console.error("Auth login failed:", e);
-      return false;
+      return null;
     } finally {
       setIsLoading(false);
     }
