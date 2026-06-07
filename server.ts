@@ -2,7 +2,6 @@ import express from "express";
 import path from "path";
 import cors from "cors";
 import { createClient } from "@supabase/supabase-js";
-import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 
 // Load environment variables
@@ -253,6 +252,9 @@ let profiles = [
     created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
   }
 ];
+
+// Local mock credential store (used when Supabase is not configured)
+const registeredUsers: { email: string; password: string; profileId: string }[] = [];
 
 // ==========================================================
 // SUPABASE CLIENT INITIALIZATION (LAZY / AUTO DETECT)
@@ -757,21 +759,130 @@ app.post("/api/auth/demo-toggle", (req, res) => {
   }
 });
 
-// Credentials verification endpoint (as requested by user)
-app.post("/api/auth/login", (req, res) => {
+// Account registration endpoint
+app.post("/api/auth/register", async (req, res) => {
+  const { email, password, full_name, phone } = req.body;
+  const cleanEmail = (email || "").trim().toLowerCase();
+  const cleanPassword = (password || "").trim();
+  const cleanName = (full_name || "").trim();
+
+  if (!cleanEmail || !cleanPassword || !cleanName) {
+    return res.status(400).json({ error: "Email, password, and full name are required." });
+  }
+  if (cleanPassword.length < 6) {
+    return res.status(400).json({ error: "Password must be at least 6 characters." });
+  }
+  if (cleanEmail === "admin@gmail.com") {
+    return res.status(400).json({ error: "This email is reserved for administration." });
+  }
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password: cleanPassword,
+        options: { data: { full_name: cleanName, phone: phone || "" } }
+      });
+      if (error) throw error;
+
+      if (data.user) {
+        await supabase.from("profiles").upsert({
+          id: data.user.id,
+          full_name: cleanName,
+          phone: phone || "",
+          address: "",
+          role: "user"
+        });
+      }
+
+      return res.json({ success: true, message: "Account created successfully. You can now sign in." });
+    } catch (error: any) {
+      return res.status(400).json({ error: error.message });
+    }
+  }
+
+  if (registeredUsers.some((u) => u.email === cleanEmail)) {
+    return res.status(400).json({ error: "An account with this email already exists." });
+  }
+
+  const newProfile = {
+    id: "user_" + Math.random().toString(36).substr(2, 9),
+    full_name: cleanName,
+    phone: phone || "",
+    address: "",
+    role: "user" as const,
+    created_at: new Date().toISOString()
+  };
+
+  registeredUsers.push({ email: cleanEmail, password: cleanPassword, profileId: newProfile.id });
+  profiles.push(newProfile);
+
+  res.json({ success: true, message: "Account created successfully. You can now sign in." });
+});
+
+// Credentials verification endpoint
+app.post("/api/auth/login", async (req, res) => {
   const { email, password } = req.body;
   const cleanEmail = (email || "").trim().toLowerCase();
   const cleanPassword = (password || "").trim();
 
-  if (cleanEmail === "admin@gmail.com" && (cleanPassword === "ADMIN1234" || cleanPassword.toUpperCase() === "ADMIN1234")) {
-    res.json({ token: "mock-admin-token", profile: profiles[1] });
-  } else if (cleanEmail && cleanPassword) {
-    // Regular valid user email
-    res.json({ token: "mock-user-token", profile: { ...profiles[0], full_name: cleanEmail.split("@")[0] } });
-  } else {
-    res.status(400).json({ error: "Missing authenticating email or verification code" });
+  if (!cleanEmail || !cleanPassword) {
+    return res.status(400).json({ error: "Missing email or password." });
   }
+
+  // Hardcoded admin credentials (works in both mock and Supabase modes)
+  if (cleanEmail === "admin@gmail.com" && cleanPassword.toUpperCase() === "ADMIN1234") {
+    return res.json({ token: "mock-admin-token", profile: profiles[1] });
+  }
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: cleanPassword
+      });
+      if (error) throw error;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", data.user.id)
+        .maybeSingle();
+
+      return res.json({
+        token: data.session?.access_token,
+        profile: profile || {
+          id: data.user.id,
+          full_name: cleanNameFromEmail(cleanEmail),
+          phone: "",
+          address: "",
+          role: "user",
+          created_at: new Date().toISOString()
+        }
+      });
+    } catch (error: any) {
+      return res.status(401).json({ error: "Invalid credentials." });
+    }
+  }
+
+  // Mock mode: verify registered users
+  const registered = registeredUsers.find((u) => u.email === cleanEmail);
+  if (registered) {
+    if (registered.password !== cleanPassword) {
+      return res.status(401).json({ error: "Invalid credentials." });
+    }
+    const profile = profiles.find((p) => p.id === registered.profileId);
+    if (profile) {
+      return res.json({ token: "mock-user-token", profile });
+    }
+  }
+
+  return res.status(401).json({ error: "Invalid credentials. Please register a new account first." });
 });
+
+function cleanNameFromEmail(email: string) {
+  return email.split("@")[0].replace(/[._]/g, " ");
+}
 
 // Update Profile Detail (Tabs editing)
 app.put("/api/users/profile", requireAuth, async (req: any, res) => {
@@ -1143,11 +1254,20 @@ app.get("/api/admin/users", requireAuth, requireAdmin, async (req, res) => {
   res.json(profiles);
 });
 
+// Global JSON error handler (prevents HTML error pages on API routes)
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("API error:", err);
+  if (!res.headersSent) {
+    res.status(err.status || 500).json({ error: err.message || "Internal server error" });
+  }
+});
+
 // ==========================================================
 // VITE CLIENT INTEGRATION MIDDLEWARES & LAUNCHER
 // ==========================================================
 async function initializeServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
